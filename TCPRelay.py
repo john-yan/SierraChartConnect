@@ -13,7 +13,7 @@ from termcolor import colored
 import colorama
 
 
-SC_PORT = 11099
+SC_PORT = 11098
 # SC Address has to be 127.0.0.1, otherwise, connection will not be able to stream data
 SC_ADDR = "127.0.0.1"
 
@@ -46,7 +46,7 @@ def ClientToSCThread(client):
             msg = client.cl_sock.recv(2048)
             if len(msg) == 0:
                 break
-            Print(colored("MSG from CL(%d)" % client.index, 'green'))
+            # Print(colored("MSG from CL(%d)" % client.index, 'green'))
             client.sc_sock.sendall(msg);
         except:
             Print(colored("Error on (%d), closing" % client.index, 'red'))
@@ -60,7 +60,7 @@ def SCToClientThread(client):
     while True:
         try:
             msg = client.sc_sock.recv(2048)
-            Print(colored("MSG from SC(%d)" % client.index, 'green'))
+            # Print(colored("MSG from SC(%d)" % client.index, 'green'))
             if len(msg) == 0:
                 break
             client.cl_sock.sendall(msg);

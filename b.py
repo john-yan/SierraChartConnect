@@ -1,3 +1,5 @@
+# This is a simple python client to streaming market data from Sierra Chart
+# using the DTC protocol
 
 import DTCProtocol_pb2 as DTC
 import socket
@@ -18,8 +20,7 @@ exchange='CME'
 
 def send(sock, json_obj):
     req = json.dumps(json_obj).encode("ascii");
-    sock.sendall(req)
-    sock.sendall('\0'.encode())
+    sock.sendall(req + b"\x00")
 
 def recv(sock):
     msg = '';
@@ -81,14 +82,14 @@ while True:
             avol=res['AskQuantity']))
     elif res['Type'] == 112:
         dt = str(datetime.fromtimestamp(res['DateTime']))
-        csv_str = "{symbol},{atbidorask},{price},{vol}".format(
+        csv_str = "{symbol},{datetime},{atbidorask},{price},{vol}".format(
             symbol=symbol,
             datetime=dt,
             atbidorask=colored("AtBid", 'red') if res["AtBidOrAsk"] == 1 else colored("AtAsk", 'green'),
             price=res['Price'],
             vol=res['Volume'])
         print(csv_str);
-        trade.write("{symbol},{atbidorask},{price},{vol}\n".format(
+        trade.write("{symbol},{datetime},{atbidorask},{price},{vol}\n".format(
             symbol=symbol,
             datetime=dt,
             atbidorask="AtBid" if res["AtBidOrAsk"] == 1 else "AtAsk",
