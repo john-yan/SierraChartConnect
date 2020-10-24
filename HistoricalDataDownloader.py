@@ -10,25 +10,6 @@ from datetime import datetime
 from termcolor import colored
 import argparse
 import colorama
-colorama.init()
-
-parser = argparse.ArgumentParser()
-parser.add_argument('--userpass', "-i", default="userpass", help="Username and Password file.")
-parser.add_argument('--address', "-a", default="192.168.130.103", help="IP Address of Sierra Chart instance")
-parser.add_argument('--port', "-p", type=int, default=8888, help="Port number of Sierra Chart instance")
-parser.add_argument('--symbol', "-s", required=True, help="Symbol Name")
-parser.add_argument('--exchange', "-e", default="CME", help="Exchange Name")
-parser.add_argument('--output', "-o", default=None, help="Output file name")
-
-args = parser.parse_args()
-
-ADDR = args.address
-PORT = args.port
-SYMBOL = args.symbol
-EXCHANGE = args.exchange
-OUTPUT = "%s.csv" % SYMBOL if args.output == None else args.output
-
-print(SYMBOL)
 '''
 json format for incoming traffic:
 {
@@ -47,14 +28,13 @@ json format for incoming traffic:
 }
 '''
 
-csv_format = "{StartDateTime},{OpenPrice},{HighPrice},{LowPrice},{LastPrice},{Volume},{NumTrades},{BidVolume},{AskVolume}\n"
 
 class Downloader:
 
-    def __init__(self, client):
+    def __init__(self, client, outfile):
         self.client = client
         self.max_json = 100
-        self.fd = open(OUTPUT, 'w')
+        self.fd = open(outfile, 'w')
         self.done_msgs = 0
 
         # write csv header row
@@ -75,6 +55,8 @@ class Downloader:
             print(colored("Unprocess MSG: " + json.dumps(msg), 'red'))
             return
 
+        csv_format = "{StartDateTime},{OpenPrice},{HighPrice},{LowPrice},{LastPrice},{Volume},{NumTrades},{BidVolume},{AskVolume}\n"
+
         self.fd.write(csv_format.format(
             StartDateTime = msg["StartDateTime"],
             OpenPrice = msg["OpenPrice"],
@@ -94,9 +76,31 @@ class Downloader:
 
 def Main():
 
+    # initialize color output
+    colorama.init()
+
+    # parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--userpass', "-i", default="userpass", help="Username and Password file.")
+    parser.add_argument('--address', "-a", default="192.168.130.103", help="IP Address of Sierra Chart instance")
+    parser.add_argument('--port', "-p", type=int, default=8888, help="Port number of Sierra Chart instance")
+    parser.add_argument('--symbol', "-s", required=True, help="Symbol Name")
+    parser.add_argument('--exchange', "-e", default="CME", help="Exchange Name")
+    parser.add_argument('--output', "-o", default=None, help="Output file name")
+
+    args = parser.parse_args()
+
+    ADDR = args.address
+    PORT = args.port
+    SYMBOL = args.symbol
+    EXCHANGE = args.exchange
+    OUTPUT = "%s.csv" % SYMBOL if args.output == None else args.output
+
+
     with open('userpass') as f:
         username = f.readline().strip('\n')
         password = f.readline().strip('\n')
+        f.close()
 
     client = DTCClient()
     client.connect(ADDR, PORT)
@@ -115,7 +119,7 @@ def Main():
         'UseZLibCompression': 0
     })
 
-    d = Downloader(client)
+    d = Downloader(client, OUTPUT)
     client.run(d.json_handler)
 
 if __name__ == "__main__":
