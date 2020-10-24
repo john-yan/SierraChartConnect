@@ -15,7 +15,7 @@ class DTCClient:
 
     HEARTBEAT_INTERNAL = 10
 
-    def __init__(self):
+    def __init__(self, ignore_heartbeat = True):
         self.ip_addr = None
         self.port = None
         self.lock = Lock()
@@ -24,6 +24,7 @@ class DTCClient:
         self.receiver_thread = None
         self.message_thread = None
         self.heartbeat_timer = None
+        self.ignore_heartbeat = ignore_heartbeat
 
     def send_json_request(self, json_obj):
         req = json.dumps(json_obj).encode("ascii");
@@ -60,7 +61,10 @@ class DTCClient:
                 index = msg.find(b'\x00')
                 if index != -1:
                     obj = json.loads(msg[0 : index].decode(encoding = 'ascii'))
-                    self.json_q.put(obj);
+                    if self.ignore_heartbeat and obj['Type'] == 3:
+                        pass
+                    else:
+                        self.json_q.put(obj);
                     msg = msg[index + 1:]
                 else:
                     break
