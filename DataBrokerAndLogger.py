@@ -95,6 +95,7 @@ class DataBroker:
         self.lock.release()
 
         self.logFD.write(msg_dump + '\n')
+        self.logFD.flush()
 
 def Main():
 
