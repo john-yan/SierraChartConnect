@@ -89,7 +89,6 @@ def follow(thefile):
     while True:
         line = thefile.readline()
         if not line:
-            return
             rlist, _, _ = select([thefile], [], [])
             if len(rlist) != 1 or thefile.closed:
                 return None
@@ -189,7 +188,7 @@ def Main():
         exit(0)
 
     infile = open(args.input, 'r')
-    hfile = open(args.historicalFile, 'w')
+    hfile = open(args.historicalFile, 'a+')
     rfile = open(args.realtimeFile, 'w')
 
     if not infile:
