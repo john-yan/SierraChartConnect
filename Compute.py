@@ -132,14 +132,20 @@ def WriteData(compute_type, datetime, data, thefile):
 
     thefile.flush()
 
-def process(compute_type, period_in_seconds, infile, hfile, rfile):
+def process(compute_type, period_in_seconds, infile, hfile, rfile, follow_mode):
 
     assert(compute_type == 'ohlc' or compute_type == 'imbalance')
 
     data = {}
     last = 0
 
-    for line in follow(infile):
+    read_from = infile
+    if follow_mode:
+        print("use follow")
+        print(follow_mode)
+        read_from = follow(infile)
+
+    for line in read_from:
 
         obj = json.loads(line.rstrip())
 
@@ -178,6 +184,7 @@ def Main():
                                                                                  1min, 5min, 10min,
                                                                                  1hr, 2hr, etc""")
     parser.add_argument('--type', '-t', default='ohlc', help="output type: ohlc or imbalance")
+    parser.add_argument('--follow', '-f', default=False, action='store_true', help="Do we follow the input file?")
 
     args = parser.parse_args()
 
@@ -203,7 +210,7 @@ def Main():
         print('Unable to open realtime data file: ', args.realtimeFile)
         exit(-1)
 
-    process(args.type, period_in_seconds, infile, hfile, rfile)
+    process(args.type, period_in_seconds, infile, hfile, rfile, args.follow)
 
 
 if __name__ == '__main__':
