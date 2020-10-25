@@ -3,6 +3,7 @@
 import argparse
 from select import select
 import re, json
+from functools import reduce
 
 """
 Computes OHLC from realtime market data
@@ -22,55 +23,67 @@ def ComputeOHLC(data, datetime, price, volume):
 
     data[datetime] = (o, new_h, new_l, new_c, new_v)
 
-def ComputeImbalance(dist, time, price, computeAbove=True, computeBelow=True):
+def ComputeImbalanceFactorForEntry(table, time, price, computeAbove=True, computeBelow=True):
 
-    key = (time, price)
-    if time not in dist or price not in dist[time]:
+    if time not in table or price not in table[time]:
         return
 
-    bid, ask, imb, ima = dist[time][price]
+    bid, ask, _, imb, ima, _ = table[time][price]
 
     # imbalance bid
-    if price + 0.25 in dist[time]:
-        ask_above = max(1, dist[time][price + 0.25][1])
+    if price + 0.25 in table[time]:
+        ask_above = max(1, table[time][price + 0.25][1])
         imb = bid / ask_above
 
     # imbalance ask
-    if price - 0.25 in dist[time]:
-        bid_below = max(1, dist[time][price - 0.25][0])
+    if price - 0.25 in table[time]:
+        bid_below = max(1, table[time][price - 0.25][0])
         ima = ask / bid_below
 
-    dist[time][price] = (bid, ask, imb, ima)
+    # update bid imbalance
+    table[time][price][3] = imb
+    # update ask imbalance
+    table[time][price][4] = ima
 
     if computeAbove:
-        ComputeImbalance(dist, time, price + 0.25, False, False)
+        ComputeImbalanceFactorForEntry(table, time, price + 0.25, False, False)
     if computeBelow:
-        ComputeImbalance(dist, time, price - 0.25, False, False)
+        ComputeImbalanceFactorForEntry(table, time, price - 0.25, False, False)
 
-def ComputeVolumeDistribution(dist, time, price, volume, bidorask, compute_imbalance=False):
+def ComputeVolumeDistribution(table, time):
 
-    # Create a new entry if not exist
-    if time not in dist:
-        dist[time] = {
-            price: (0, 0, 0.0, 0.0)
+    if time not in table:
+        return
+
+    totalVol = reduce(lambda total, price: total + table[time][price][2], table[time].keys(), 0)
+
+    for price in table[time].keys():
+        bid, ask, tot, imb, ima, dist = table[time][price]
+        dist = tot / totalVol
+        table[time][price][5] = dist
+
+def ComputeImbalanceTable(table, time, price, volume, isBid):
+
+    # Create or update table entries
+    if time not in table:
+        table[time] = {
+            price: [0, 0, 0, 0.0, 0.0, 0.0]
         }
 
-    if price not in dist[time]:
-        dist[time][price] = (0, 0, 0.0, 0.0)
+    if price not in table[time]:
+        table[time][price] = [0, 0, 0, 0.0, 0.0, 0.0]
 
-    bid, ask, imb, ima = dist[time][price]
+    bid, ask, tot, imb, ima, dist = table[time][price]
 
-    if bidorask == 0:
-        bid += volume
+    if isBid == 0:
+        table[time][price][0] += volume
     else:
-        ask += volume
+        table[time][price][1] += volume
 
-    # Update table entry
-    dist[time][price] = (bid, ask, imb, ima)
+    table[time][price][2] = bid + ask + volume
 
-    # compute imbalance if required
-    if compute_imbalance:
-        ComputeImbalance(dist, time, price, True, True)
+    ComputeImbalanceFactorForEntry(table, time, price, True, True)
+    ComputeVolumeDistribution(table, time)
 
 def follow(thefile):
     while True:
@@ -100,41 +113,25 @@ def MatchPeriod(Type):
     return None
 
 # ohlc_output_format: datetime, open, high, low, close, volume
+ohlc_output_heads = 'DateTime, Open, High, Low, Close, volume\n'
 ohlc_output_format = '%d,%.2f,%.2f,%.2f,%.2f,%d\n'
 
 # imbalance_output_format: datetime, price, volatbid, volatask, imb, ima
-imbalance_output_format = '%d,%.2f,%d,%d,%.2f,%.2f\n'
+imbalance_output_heads = 'DateTime, Price, VolumeAtBid, VolumeAtAsk, TotalVolume, BidImbalance, AskImbalance, VolumeDistribution\n'
+imbalance_output_format = '%d,%.2f,%d,%d,%d,%.2f,%.2f,%.2f\n'
 
-def WriteRealtimeData(compute_type, datetime, price, data, rfile):
-
-    assert(compute_type == 'ohlc' or compute_type == 'imbalance')
-
-    if compute_type == 'ohlc':
-        rfile.write(ohlc_output_format % (datetime, *data[datetime]))
-
-    elif compute_type == 'imbalance':
-        rfile.write(imbalance_output_format % (datetime, price, *data[datetime][price]))
-
-        if price + 0.25 in data[datetime]:
-            rfile.write(imbalance_output_format % (datetime, price + 0.25, *data[datetime][price + 0.25]))
-        if price - 0.25 in data[datetime]:
-            rfile.write(imbalance_output_format % (datetime, price - 0.25, *data[datetime][price - 0.25]))
-
-
-    rfile.flush()
-
-def WriteHistoricalData(compute_type, last, data, hfile):
+def WriteData(compute_type, datetime, data, thefile):
 
     assert(compute_type == 'ohlc' or compute_type == 'imbalance')
 
     if compute_type == 'ohlc':
-        hfile.write(ohlc_output_format % (last, *data[last]))
+        thefile.write(ohlc_output_format % (datetime, *data[datetime]))
 
     elif compute_type == 'imbalance':
-        for p in data[last].keys():
-            hfile.write(imbalance_output_format % (last, p, *data[last][p]))
+        for p in data[datetime].keys():
+            thefile.write(imbalance_output_format % (datetime, p, *data[datetime][p]))
 
-    hfile.flush()
+    thefile.flush()
 
 def process(compute_type, period_in_seconds, infile, hfile, rfile):
 
@@ -155,22 +152,22 @@ def process(compute_type, period_in_seconds, infile, hfile, rfile):
         datetime = obj['DateTime']
         price = obj['Price']
         volume = obj['Volume']
-        boa = obj['AtBidOrAsk']
+        isBid = obj['AtBidOrAsk'] == 1
 
         datetime -= datetime % period_in_seconds
 
         if compute_type == 'ohlc':
             ComputeOHLC(data, datetime, price, volume)
         elif compute_type == 'imbalance':
-            ComputeVolumeDistribution(data, datetime, price, volume, boa, True)
+            ComputeImbalanceTable(data, datetime, price, volume, isBid)
 
         if last != datetime:
             # output to historical file if time has pass to new candle
             if last in data:
-                WriteHistoricalData(compute_type, last, data, hfile)
+                WriteData(compute_type, last, data, hfile)
             last = datetime
 
-        WriteRealtimeData(compute_type, datetime, price, data, rfile)
+        WriteData(compute_type, datetime, data, rfile)
 
 def Main():
 
