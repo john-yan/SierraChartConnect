@@ -244,7 +244,7 @@ class Server:
             print('updater exits due to error ', err)
 
 def Main():
-    server = Server('ESZ0-CME-imbalance-1min.rfile', 'ESZ0-CME-imbalance-1min.hfile')
+    server = Server('ESZ0-CME-imbalance-5min.rfile', 'ESZ0-CME-imbalance-5min.hfile')
 
 Main()
 
