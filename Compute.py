@@ -159,6 +159,9 @@ def process(compute_type, period_in_seconds, infile, hfile, rfile, follow_mode):
     data = {}
     last = 0
 
+    # write period in the front
+    hfile.write("%d\n" % period_in_seconds)
+
     read_from = infile
     if follow_mode:
         read_from = follow(infile)
