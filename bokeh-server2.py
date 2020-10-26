@@ -18,7 +18,7 @@ import numpy as np
 from bokeh.plotting import figure, curdoc
 from tornado import gen
 from functools import partial
-from bokeh.models import ColumnDataSource
+from bokeh.models import ColumnDataSource, FixedTicker
 from time import sleep
 import os
 
@@ -170,6 +170,8 @@ class Server:
         TOOLS = "pan,xwheel_zoom,ywheel_zoom,wheel_zoom,box_zoom,reset,save,crosshair"
         self.plot = figure(tools=TOOLS, x_axis_type = 'datetime')
         self.plot.sizing_mode = 'stretch_both'
+        self.plot.yaxis.formatter.use_scientific = False
+        self.plot.yaxis.ticker = FixedTicker(ticks=np.arange(start=2000, stop=4000, step=0.25))
 
         table = [line.rstrip().split(',') for line in FileReader(self.hfile)]
         source = ColumnDataSource(ComputeChartParameter(table, self.width, self.highlight_factor))
