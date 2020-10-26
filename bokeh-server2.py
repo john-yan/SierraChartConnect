@@ -90,45 +90,46 @@ def SessionReader(thefile):
 
         yield line
 
+
+def ComputeChartParameter(table):
+    raw_data = pd.DataFrame(table, columns=columns)
+
+    raw_data.DateTime = raw_data.DateTime.astype(np.int64) * time_factor
+    CellTop = raw_data.Price.astype(np.float32) + tick
+    CellBottom = raw_data.Price.astype(np.float32)
+    CellLeft = raw_data.DateTime.astype(np.int64) - x_half_length
+    CellRight = raw_data.DateTime.astype(np.int64) + x_half_length
+    CellMiddle = raw_data.DateTime.astype(np.int64)
+    VolAtBidText = raw_data.VolumeAtBid.astype('string')
+    VolAtAskText = raw_data.VolumeAtAsk.astype('string')
+    VolAtBidColor = raw_data.BidImbalance.astype(np.float32).apply(
+            lambda x: '#000000' if x < highlight_factor else '#FF0000')
+    VolAtAskColor = raw_data.AskImbalance.astype(np.float32).apply(
+            lambda x: '#000000' if x < highlight_factor else '#00FF00')
+
+    TotalVolume = raw_data.TotalVolume.astype(np.int32)
+    VolumeDist = raw_data.VolumeDistribution.astype(np.float32)
+    VolumeEnd = CellLeft + VolumeDist * x_length
+
+
+    chart_parameter = pd.DataFrame({
+            'CellTop': CellTop,
+            'CellBottom': CellBottom,
+            'CellLeft': CellLeft.astype(np.float64),
+            'CellRight': CellRight.astype(np.float64),
+            'CellMiddle': CellMiddle.astype(np.float64),
+            'VolAtBidText': VolAtBidText,
+            'Separator': str('x'),
+            'VolAtAskText': VolAtAskText,
+            'VolAtBidColor': VolAtBidColor.astype('string'),
+            'VolAtAskColor': VolAtAskColor.astype('string'),
+            'TotalVolume': TotalVolume,
+            'VolumeEnd': VolumeEnd.astype(np.float64)
+    })
+
+    return chart_parameter
+
 class Server:
-
-    def ComputeChartParameter(self, table):
-        raw_data = pd.DataFrame(table, columns=columns)
-
-        raw_data.DateTime = raw_data.DateTime.astype(np.int64) * time_factor
-        CellTop = raw_data.Price.astype(np.float32) + tick
-        CellBottom = raw_data.Price.astype(np.float32)
-        CellLeft = raw_data.DateTime.astype(np.int64) - x_half_length
-        CellRight = raw_data.DateTime.astype(np.int64) + x_half_length
-        CellMiddle = raw_data.DateTime.astype(np.int64)
-        VolAtBidText = raw_data.VolumeAtBid.astype('string')
-        VolAtAskText = raw_data.VolumeAtAsk.astype('string')
-        VolAtBidColor = raw_data.BidImbalance.astype(np.float32).apply(
-                lambda x: '#000000' if x < highlight_factor else '#FF0000')
-        VolAtAskColor = raw_data.AskImbalance.astype(np.float32).apply(
-                lambda x: '#000000' if x < highlight_factor else '#00FF00')
-
-        TotalVolume = raw_data.TotalVolume.astype(np.int32)
-        VolumeDist = raw_data.VolumeDistribution.astype(np.float32)
-        VolumeEnd = CellLeft + VolumeDist * x_length
-
-
-        chart_parameter = pd.DataFrame({
-                'CellTop': CellTop,
-                'CellBottom': CellBottom,
-                'CellLeft': CellLeft.astype(np.float64),
-                'CellRight': CellRight.astype(np.float64),
-                'CellMiddle': CellMiddle.astype(np.float64),
-                'VolAtBidText': VolAtBidText,
-                'Separator': str('x'),
-                'VolAtAskText': VolAtAskText,
-                'VolAtBidColor': VolAtBidColor.astype('string'),
-                'VolAtAskColor': VolAtAskColor.astype('string'),
-                'TotalVolume': TotalVolume,
-                'VolumeEnd': VolumeEnd.astype(np.float64)
-        })
-
-        return chart_parameter
 
     def plot_source(self, source):
         # plot base
@@ -157,22 +158,20 @@ class Server:
 
     def __init__(self, rfile, hfile):
 
-        self.rfile = open(rfile)
         self.hfile = open(hfile)
-
+        self.rfile = open(rfile)
         self.rfile.seek(0, 2)
-
-        table = [line.rstrip().split(',') for line in FileReader(self.hfile)]
-
-        self.hParameters = self.ComputeChartParameter(table)
-        self.hsource = ColumnDataSource(self.hParameters)
-        self.hIndex = len(table)
-        self.rsource = None
 
         TOOLS = "pan,xwheel_zoom,ywheel_zoom,wheel_zoom,box_zoom,reset,save,crosshair"
         self.plot = figure(tools=TOOLS, x_axis_type = 'datetime')
         self.plot.sizing_mode = 'stretch_both'
-        self.plot_source(self.hsource)
+
+        table = [line.rstrip().split(',') for line in FileReader(self.hfile)]
+        source = ColumnDataSource(ComputeChartParameter(table))
+        self.plot_source(source)
+
+        self.rsource = ColumnDataSource(ComputeChartParameter([]))
+        self.plot_source(self.rsource)
 
         doc.add_root(self.plot)
         doc.on_session_destroyed(self.close)
@@ -192,14 +191,10 @@ class Server:
         hData, rData = self.queue.get()
 
         if hData['update']:
-            self.hsource.data = hData['data']
+            self.plot_source(hData['data'])
 
         if rData['update']:
-            if self.rsource == None:
-                self.rsource = ColumnDataSource(rData['data'])
-                self.plot_source(self.rsource)
-            else:
-                self.rsource.data = rData['data']
+            self.rsource.data = rData['data']
 
     def update(self):
 
@@ -214,8 +209,7 @@ class Server:
 
                 table = [line.rstrip().split(',') for line in FileReader(self.hfile)]
                 if len(table) > 0:
-                    self.hParameters = self.hParameters.append(self.ComputeChartParameter(table), ignore_index=True)
-                    hData['data'] = self.hParameters
+                    hData['data'] = ComputeChartParameter(table)
                     hData['update'] = True
 
                 latest_table = []
@@ -227,7 +221,7 @@ class Server:
                         break
 
                 if len(latest_table) > 0:
-                    data = self.ComputeChartParameter(latest_table)
+                    data = ComputeChartParameter(latest_table)
                     rData['data'] = data
                     rData['update'] = True
 
