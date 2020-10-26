@@ -108,7 +108,7 @@ def Main():
     parser.add_argument('--symbol', "-s", required=True, help="Symbol Name")
     parser.add_argument('--exchange', "-e", default="CME", help="Exchange Name")
     parser.add_argument('--logFile', "-f", default=None, help="Output file name")
-    parser.add_argument('--append', default=True, help="Do we append to output file")
+    parser.add_argument('--append', default=False, action='store_true', help="Do we append to output file?")
     parser.add_argument('--serverPort', type=int, default=1234, help="Server listening port")
     parser.add_argument('--serverAddress', default="0.0.0.0", help="Server IP Address")
 

@@ -4,6 +4,7 @@ import argparse
 from select import select
 import re, json
 from functools import reduce
+from time import sleep
 
 """
 Computes OHLC from realtime market data
@@ -55,11 +56,11 @@ def ComputeVolumeDistribution(table, time):
     if time not in table:
         return
 
-    totalVol = reduce(lambda total, price: total + table[time][price][2], table[time].keys(), 0)
+    maxVol = reduce(lambda maxvol, price: max(maxvol, table[time][price][2]), table[time].keys(), 0)
 
     for price in table[time].keys():
         bid, ask, tot, imb, ima, dist = table[time][price]
-        dist = tot / totalVol
+        dist = tot / maxVol
         table[time][price][5] = dist
 
 def ComputeImbalanceTable(table, time, price, volume, isBid):
@@ -85,13 +86,26 @@ def ComputeImbalanceTable(table, time, price, volume, isBid):
     ComputeImbalanceFactorForEntry(table, time, price, True, True)
     ComputeVolumeDistribution(table, time)
 
+def ReadOneLine(thefile):
+
+    line = thefile.readline()
+
+    if not line:
+        return line
+
+    while line[-1] != '\n':
+        sleep(0.5)
+        line += thefile.readline()
+
+    return line
+
 def follow(thefile):
     while True:
-        line = thefile.readline()
+        line = ReadOneLine(thefile)
         if not line:
-            rlist, _, _ = select([thefile], [], [])
-            if len(rlist) != 1 or thefile.closed:
+            if thefile.closed:
                 return None
+            sleep(0.5)
             continue
         yield line
 
@@ -119,9 +133,12 @@ ohlc_output_format = '%d,%.2f,%.2f,%.2f,%.2f,%d\n'
 imbalance_output_heads = 'DateTime, Price, VolumeAtBid, VolumeAtAsk, TotalVolume, BidImbalance, AskImbalance, VolumeDistribution\n'
 imbalance_output_format = '%d,%.2f,%d,%d,%d,%.2f,%.2f,%.2f\n'
 
-def WriteData(compute_type, datetime, data, thefile):
+def WriteData(compute_type, datetime, data, thefile, write_session):
 
     assert(compute_type == 'ohlc' or compute_type == 'imbalance')
+
+    if write_session:
+        thefile.write("SESSION START\n")
 
     if compute_type == 'ohlc':
         thefile.write(ohlc_output_format % (datetime, *data[datetime]))
@@ -129,6 +146,9 @@ def WriteData(compute_type, datetime, data, thefile):
     elif compute_type == 'imbalance':
         for p in data[datetime].keys():
             thefile.write(imbalance_output_format % (datetime, p, *data[datetime][p]))
+
+    if write_session:
+        thefile.write("SESSION END\n")
 
     thefile.flush()
 
@@ -141,13 +161,18 @@ def process(compute_type, period_in_seconds, infile, hfile, rfile, follow_mode):
 
     read_from = infile
     if follow_mode:
-        print("use follow")
-        print(follow_mode)
         read_from = follow(infile)
 
+    read_cache = ''
     for line in read_from:
 
-        obj = json.loads(line.rstrip())
+        read_cache += line
+
+        if read_cache[-1] != '\n':
+            continue
+
+        obj = json.loads(read_cache.rstrip())
+        read_cache = ''
 
         if 'Type' not in obj:
             continue
@@ -169,10 +194,10 @@ def process(compute_type, period_in_seconds, infile, hfile, rfile, follow_mode):
         if last != datetime:
             # output to historical file if time has pass to new candle
             if last in data:
-                WriteData(compute_type, last, data, hfile)
+                WriteData(compute_type, last, data, hfile, False)
             last = datetime
 
-        WriteData(compute_type, datetime, data, rfile)
+        WriteData(compute_type, datetime, data, rfile, True)
 
 def Main():
 
@@ -195,7 +220,7 @@ def Main():
         exit(0)
 
     infile = open(args.input, 'r')
-    hfile = open(args.historicalFile, 'a+')
+    hfile = open(args.historicalFile, 'w')
     rfile = open(args.realtimeFile, 'w')
 
     if not infile:
