@@ -21,9 +21,9 @@ from functools import partial
 from bokeh.models import ColumnDataSource, HoverTool, FixedTicker
 from time import sleep
 import os
+import pytz
 
-os.environ['TZ'] = 'UTC+0'
-time.tzset()
+TimeShift = pytz.timezone('US/Eastern').utcoffset(datetime.now()).total_seconds()
 
 doc = curdoc()
 time_factor = 1000
@@ -56,7 +56,7 @@ def ReadOneLine(thefile):
         return line
 
     while line[-1] != '\n':
-        sleep(0.5)
+        sleep(0.01)
         line += thefile.readline()
 
     return line
@@ -95,7 +95,7 @@ def ComputeChartParameter(table, width, imbalance_highlight_factor):
 
     raw_data = pd.DataFrame(table, columns=columns)
 
-    DateTime = raw_data.DateTime.astype(np.int64) * time_factor
+    DateTime = (raw_data.DateTime.astype(np.int64) + TimeShift) * time_factor
     CellTop = raw_data.Price.astype(np.float32) + tick
     CellBottom = raw_data.Price.astype(np.float32)
     CellLeft = DateTime  - width / 2
@@ -104,9 +104,9 @@ def ComputeChartParameter(table, width, imbalance_highlight_factor):
     VolAtBidText = raw_data.VolumeAtBid.astype('string')
     VolAtAskText = raw_data.VolumeAtAsk.astype('string')
     VolAtBidColor = raw_data.BidImbalance.astype(np.float32).apply(
-            lambda x: '#000000' if x < imbalance_highlight_factor else '#FF0000')
+            lambda x: '#000000' if x < imbalance_highlight_factor else '#8F0000')
     VolAtAskColor = raw_data.AskImbalance.astype(np.float32).apply(
-            lambda x: '#000000' if x < imbalance_highlight_factor else '#00FF00')
+            lambda x: '#000000' if x < imbalance_highlight_factor else '#008F00')
 
     TotalVolume = raw_data.TotalVolume.astype(np.int32)
     VolumeDist = raw_data.VolumeDistribution.astype(np.float32)
@@ -139,7 +139,7 @@ class Server:
 
         # plot volume profile
         self.plot.quad(top='CellTop', bottom='CellBottom', left='CellLeft',
-                            right='VolumeEnd', color='#A0A0A0', source=source)
+                            right='VolumeEnd', color='#B0B0B0', source=source)
 
         # plot bid
         self.plot.text(x='CellMiddle', y='CellBottom', text='VolAtBidText',
@@ -179,7 +179,7 @@ class Server:
         self.rfile.seek(0, 2)
 
         self.period_in_seconds = int(self.hfile.readline().rstrip())
-        self.width= int(self.period_in_seconds * time_factor * 0.85)
+        self.width = int(self.period_in_seconds * time_factor * 0.85)
         self.highlight_factor = 3
 
         TOOLS = "pan,xwheel_zoom,ywheel_zoom,wheel_zoom,box_zoom,reset,save,crosshair"
