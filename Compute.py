@@ -94,19 +94,24 @@ def ReadOneLine(thefile):
         return line
 
     while line[-1] != '\n':
-        sleep(0.5)
+        sleep(0.1)
         line += thefile.readline()
 
     return line
 
-def follow(thefile):
+def follow(thefile, wait_time = 120):
+
+    wait = wait_time
+
     while True:
         line = ReadOneLine(thefile)
         if not line:
-            if thefile.closed:
+            if thefile.closed or wait <= 0:
                 return None
+            wait -= 0.5
             sleep(0.5)
             continue
+        wait = wait_time
         yield line
 
 def MatchPeriod(Type):
@@ -201,6 +206,9 @@ def process(compute_type, period_in_seconds, infile, hfile, rfile, follow_mode):
             last = datetime
 
         WriteData(compute_type, datetime, data, rfile, True)
+
+    # write last data
+    WriteData(compute_type, last, data, hfile, False)
 
 def Main():
 
