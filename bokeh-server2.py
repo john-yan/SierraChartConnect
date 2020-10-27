@@ -18,7 +18,7 @@ import numpy as np
 from bokeh.plotting import figure, curdoc
 from tornado import gen
 from functools import partial
-from bokeh.models import ColumnDataSource, FixedTicker
+from bokeh.models import ColumnDataSource, HoverTool, FixedTicker
 from time import sleep
 import os
 
@@ -135,7 +135,7 @@ class Server:
     def plot_source(self, source):
         # plot base
         self.plot.quad(top='CellTop', bottom='CellBottom', left='CellLeft',
-                            right='CellRight', color='#F0F0F0', source=source)
+                            right='CellRight', color='#F0F0F0', source=source, name='hoverable')
 
         # plot volume profile
         self.plot.quad(top='CellTop', bottom='CellBottom', left='CellLeft',
@@ -155,6 +155,21 @@ class Server:
         self.plot.text(x='CellMiddle', y='CellBottom', text='VolAtAskText',
                 text_color='VolAtAskColor', text_align='left', text_font_size='12px',
                 source=source, x_offset=5)
+
+        for i in range(len(self.plot.tools)):
+            if isinstance(self.plot.tools[i], HoverTool):
+                del self.plot.tools[i]
+
+        TOOLTIPS = [
+                ("Price", "@CellBottom{0.2f}"),
+        ]
+
+        hoverTool = HoverTool(
+            tooltips=TOOLTIPS,
+            names = ['hoverable']
+        )
+
+        self.plot.add_tools(hoverTool)
 
 
     def __init__(self, rfile, hfile):
