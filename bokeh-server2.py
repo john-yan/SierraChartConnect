@@ -45,9 +45,6 @@ chart_columns = [
     'VolumeEnd'
 ]
 
-def WaitUntilFileReady(filelist):
-    rlist, _, _ = select(filelist, [], [])
-
 def ReadOneLine(thefile):
 
     line = thefile.readline()
@@ -172,13 +169,13 @@ class Server:
         self.plot.add_tools(hoverTool)
 
 
-    def __init__(self, rfile, hfile):
+    def __init__(self, imba_rfile, imba_hfile):
 
-        self.hfile = open(hfile)
-        self.rfile = open(rfile)
-        self.rfile.seek(0, 2)
+        self.imba_hfile = open(imba_hfile)
+        self.imba_rfile = open(imba_rfile)
+        self.imba_rfile.seek(0, 2)
 
-        self.period_in_seconds = int(self.hfile.readline().rstrip())
+        self.period_in_seconds = int(self.imba_hfile.readline().rstrip())
         self.width = int(self.period_in_seconds * time_factor * 0.85)
         self.highlight_factor = 3
 
@@ -188,7 +185,7 @@ class Server:
         self.plot.yaxis.formatter.use_scientific = False
         self.plot.yaxis.ticker = FixedTicker(ticks=np.arange(start=2000, stop=4000, step=0.25))
 
-        table = [line.rstrip().split(',') for line in FileReader(self.hfile)]
+        table = [line.rstrip().split(',') for line in FileReader(self.imba_hfile)]
         source = ColumnDataSource(ComputeChartParameter(table, self.width, self.highlight_factor))
         self.plot_source(source)
 
@@ -203,8 +200,8 @@ class Server:
         self.thread.start()
 
     def close(self, session_context):
-        self.rfile.close()
-        self.hfile.close()
+        self.imba_rfile.close()
+        self.imba_hfile.close()
         pass
 
     @gen.coroutine
@@ -222,21 +219,21 @@ class Server:
 
         try:
             while True:
-                if self.rfile.closed or self.hfile.closed:
-                    print('rfile or hfile has been closed.')
+                if self.imba_rfile.closed or self.imba_hfile.closed:
+                    print('imba_rfile or imba_hfile has been closed.')
                     return
 
                 hData = { 'update': False, 'data': None }
                 rData = { 'update': False, 'data': None }
 
-                table = [line.rstrip().split(',') for line in FileReader(self.hfile)]
+                table = [line.rstrip().split(',') for line in FileReader(self.imba_hfile)]
                 if len(table) > 0:
                     hData['data'] = ComputeChartParameter(table, self.width, self.highlight_factor)
                     hData['update'] = True
 
                 latest_table = []
                 while True:
-                    table = [line.rstrip().split(',') for line in SessionReader(self.rfile)]
+                    table = [line.rstrip().split(',') for line in SessionReader(self.imba_rfile)]
                     if len(table) > 0:
                         latest_table = table
                     else:
@@ -261,11 +258,11 @@ class Server:
 def Main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--rfile', default='ESZ0-CME-imbalance-5min.rfile', help="Realtime file")
-    parser.add_argument('--hfile', default='ESZ0-CME-imbalance-5min.hfile', help="Historical file")
+    parser.add_argument('--imbaRfile', default='ESZ0-CME-imbalance-5min.rfile', help="Realtime file")
+    parser.add_argument('--imbaHfile', default='ESZ0-CME-imbalance-5min.hfile', help="Historical file")
 
     args = parser.parse_args()
-    server = Server(args.rfile, args.hfile)
+    server = Server(args.imbaRfile, args.imbaHfile)
 
 Main()
 
