@@ -58,7 +58,7 @@ def ReadOneLine(thefile):
 
     return line
 
-def FileReader(thefile):
+def LineReader(thefile):
     while True:
         line = ReadOneLine(thefile)
         if not line:
@@ -67,7 +67,7 @@ def FileReader(thefile):
 
 def SessionReader(thefile):
 
-    reader = FileReader(thefile)
+    reader = LineReader(thefile)
     isFirstLine = True
 
     for line in reader:
@@ -185,7 +185,7 @@ class Server:
         self.plot.yaxis.formatter.use_scientific = False
         self.plot.yaxis.ticker = FixedTicker(ticks=np.arange(start=2000, stop=4000, step=0.25))
 
-        table = [line.rstrip().split(',') for line in FileReader(self.imba_hfile)]
+        table = [line.rstrip().split(',') for line in LineReader(self.imba_hfile)]
         source = ColumnDataSource(ComputeChartParameter(table, self.width, self.highlight_factor))
         self.plot_source(source)
 
@@ -226,7 +226,7 @@ class Server:
                 hData = { 'update': False, 'data': None }
                 rData = { 'update': False, 'data': None }
 
-                table = [line.rstrip().split(',') for line in FileReader(self.imba_hfile)]
+                table = [line.rstrip().split(',') for line in LineReader(self.imba_hfile)]
                 if len(table) > 0:
                     hData['data'] = ComputeChartParameter(table, self.width, self.highlight_factor)
                     hData['update'] = True
