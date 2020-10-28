@@ -259,7 +259,13 @@ class Server:
             print('updater exits due to error ', err)
 
 def Main():
-    server = Server('ESZ0-CME-imbalance-5min.rfile', 'ESZ0-CME-imbalance-5min.hfile')
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--rfile', default='ESZ0-CME-imbalance-5min.rfile', help="Realtime file")
+    parser.add_argument('--hfile', default='ESZ0-CME-imbalance-5min.hfile', help="Historical file")
+
+    args = parser.parse_args()
+    server = Server(args.rfile, args.hfile)
 
 Main()
 
