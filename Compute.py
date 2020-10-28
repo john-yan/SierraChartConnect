@@ -99,7 +99,7 @@ def ReadOneLine(thefile):
 
     return line
 
-def follow(thefile, wait_time = 120):
+def follow(thefile, wait_time = 60 * 16):
 
     wait = wait_time
 
