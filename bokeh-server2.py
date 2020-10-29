@@ -347,7 +347,7 @@ class Server:
 
                 if len(ohlc_rtable) > 0:
                     ohlc = ComputeOHLCChartParameter(ohlc_rtable, self.width)
-                    rData['imba'] = ohlc
+                    rData['ohlc'] = ohlc
                     update_ready = True
 
 
