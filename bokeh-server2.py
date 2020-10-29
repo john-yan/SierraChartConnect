@@ -209,13 +209,13 @@ def PlotImbalanceChart(fig, source, colorProfile):
 
 def UpdateHoverTool(fig):
 
-    # remove the old one
+    TOOLTIPS = [ ("Price", "@CellBottom{0.2f}") ]
+    hoverTool = HoverTool(tooltips=TOOLTIPS, names = ['hoverable'])
+
     for i in range(len(fig.tools)):
         if isinstance(fig.tools[i], HoverTool):
             del fig.tools[i]
-
-    TOOLTIPS = [ ("Price", "@CellBottom{0.2f}") ]
-    hoverTool = HoverTool(tooltips=TOOLTIPS, names = ['hoverable'])
+            break
 
     # Add the new one
     fig.add_tools(hoverTool)
@@ -244,7 +244,7 @@ class Server:
         self.width = int(self.period_in_seconds * time_factor * 0.85)
         self.highlight_factor = 3
 
-        TOOLS = "pan,xwheel_zoom,ywheel_zoom,wheel_zoom,box_zoom,reset,save,crosshair"
+        TOOLS = "pan,xwheel_zoom,ywheel_zoom,wheel_zoom,box_zoom,reset,save,crosshair,hover"
 
         self.plot = figure(tools=TOOLS, x_axis_type = 'datetime')
         self.plot.sizing_mode = 'stretch_both'
@@ -288,17 +288,13 @@ class Server:
 
         if not hData['imba'].empty:
             PlotImbalanceChart(self.plot, hData['imba'], self.colorProfile)
-
-        if not hData['ohlc'].empty:
             PlotOHLCChart(self.plot, hData['ohlc'])
+            UpdateHoverTool(self.plot)
 
         if not rData['imba'].empty:
             self.imba_rsource.data = rData['imba']
-
-        if not rData['ohlc'].empty:
             self.ohlc_rsource.data = rData['ohlc']
 
-        UpdateHoverTool(self.plot)
 
     def update(self):
 
@@ -315,13 +311,17 @@ class Server:
                 imba_table = [ line.rstrip().split(',') for line in LineReader(self.imba_hfile) ]
 
                 if len(imba_table) > 0:
+                    while True:
+                        ohlc_table = [ line.rstrip().split(',') for line in LineReader(self.ohlc_hfile) ]
+                        if len(ohlc_table) > 0:
+                            break
+                        else:
+                            sleep(0.1)
+                            continue
+
                     hData['imba'] = ComputeImbalanceChartParameter(imba_table, self.width, self.highlight_factor)
-                    update_ready = True
-
-                ohlc_table = [ line.rstrip().split(',') for line in LineReader(self.ohlc_hfile) ]
-
-                if len(ohlc_table) > 0:
                     hData['ohlc'] = ComputeOHLCChartParameter(ohlc_table, self.width)
+
                     update_ready = True
 
                 imba_rtable = []
@@ -333,25 +333,26 @@ class Server:
                         break
 
                 if len(imba_rtable) > 0:
+
+                    ohlc_rtable = []
+                    while True:
+                        table = [ line.rstrip().split(',') for line in SessionReader(self.ohlc_rfile) ]
+                        if len(table) > 0:
+                            ohlc_rtable = table
+                        elif len(ohlc_rtable) == 0:
+                            sleep(0.1)
+                            continue
+                        else:
+                            break
+
                     imba = ComputeImbalanceChartParameter(imba_rtable, self.width, self.highlight_factor)
-                    rData['imba'] = imba
-                    update_ready = True
-
-                ohlc_rtable = []
-                while True:
-                    table = [ line.rstrip().split(',') for line in SessionReader(self.ohlc_rfile) ]
-                    if len(table) > 0:
-                        ohlc_rtable = table
-                    else:
-                        break
-
-                if len(ohlc_rtable) > 0:
                     ohlc = ComputeOHLCChartParameter(ohlc_rtable, self.width)
+                    rData['imba'] = imba
                     rData['ohlc'] = ohlc
                     update_ready = True
 
 
-                if update_ready :
+                if update_ready:
                     self.queue.put((hData, rData))
 
                     # update the document from callback
