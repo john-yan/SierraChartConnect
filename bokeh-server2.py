@@ -358,7 +358,7 @@ class Server:
                     # update the document from callback
                     doc.add_next_tick_callback(self.update_doc)
 
-                sleep(0.5)
+                sleep(0.1)
 
         except Exception as err:
             print('updater exits due to error ', err)
