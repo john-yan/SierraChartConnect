@@ -226,7 +226,7 @@ def UpdateHoverTool(fig):
 
 class Server:
 
-    def __init__(self, imba_rfile, imba_hfile, ohlc_rfile, ohlc_hfile, colorProfile):
+    def __init__(self, imba_rfile, imba_hfile, ohlc_rfile, ohlc_hfile):
 
         self.imba_hfile = open(imba_hfile)
         self.imba_rfile = open(imba_rfile)
