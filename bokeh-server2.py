@@ -18,7 +18,8 @@ import numpy as np
 from bokeh.plotting import figure, curdoc
 from tornado import gen
 from functools import partial
-from bokeh.models import ColumnDataSource, HoverTool, FixedTicker
+from bokeh.models import ColumnDataSource, HoverTool, CheckboxGroup, AdaptiveTicker, RadioGroup
+from bokeh.layouts import row, column
 from time import sleep
 import os
 import pytz
@@ -181,7 +182,7 @@ def ComputeImbalanceChartParameter(table, width, imbalance_highlight_factor):
 
 def PlotOHLCChart(fig, source):
     fig.quad(top='CellTop', bottom='CellBottom', left='CellLeft',
-                        right='CellRight', source=source, fill_alpha=0.0, line_color='Color', line_width=2)
+                        right='CellRight', source=source, fill_alpha=0.0, line_color='Color', line_width=2, name='OCBox')
 
 def PlotImbalanceChart(fig, source, colorProfile):
     # plot base
@@ -195,17 +196,17 @@ def PlotImbalanceChart(fig, source, colorProfile):
     # plot bid
     fig.text(x='CellMiddle', y='CellBottom', text='VolAtBidText',
             text_color='VolAtBidColor', text_align='right', text_font_size='12px',
-            source=source, x_offset=-5)
+            source=source, x_offset=-5, name='imbalance_text')
 
     # plot x
     fig.text(x='CellMiddle', y='CellBottom', text='Separator',
             text_color='#000000', text_align='center', text_font_size='12px',
-            source=source)
+            source=source, name='imbalance_text')
 
     # plot ask
     fig.text(x='CellMiddle', y='CellBottom', text='VolAtAskText',
             text_color='VolAtAskColor', text_align='left', text_font_size='12px',
-            source=source, x_offset=5)
+            source=source, x_offset=5, name='imbalance_text')
 
 def UpdateHoverTool(fig):
 
@@ -249,7 +250,7 @@ class Server:
         self.plot = figure(tools=TOOLS, x_axis_type = 'datetime')
         self.plot.sizing_mode = 'stretch_both'
         self.plot.yaxis.formatter.use_scientific = False
-        self.plot.yaxis.ticker = FixedTicker(ticks=np.arange(start=2000, stop=4000, step=0.25))
+        self.plot.yaxis.ticker = AdaptiveTicker(mantissas=[0.25, 0.5, 0.75, 1], num_minor_ticks=0, desired_num_ticks=6)
 
         imba_table = [line.rstrip().split(',') for line in LineReader(self.imba_hfile)]
         ohlc_table = [line.rstrip().split(',') for line in LineReader(self.ohlc_hfile)]
@@ -268,12 +269,31 @@ class Server:
 
         UpdateHoverTool(self.plot)
 
-        doc.add_root(self.plot)
+        self.checkbox = CheckboxGroup(labels=["Imbalance Table", "OCBox"], active=[0, 1], height_policy='fit', width_policy='min')
+        self.checkbox.on_change('active', self.checkbox_callback)
+
+        self.radio = RadioGroup(labels=["Gray", "Color"], height_policy='fit', width_policy='fit')
+        self.radio.on_change('active', self.radio_callback)
+
+        control = row(children=[self.checkbox, self.radio], height_policy='fit')
+
+        doc.add_root(column(children=[control, self.plot], sizing_mode='stretch_both'))
         doc.on_session_destroyed(self.close)
 
         self.queue = Queue(maxsize=1)
         self.thread = threading.Thread(target=self.update, daemon=True)
         self.thread.start()
+
+    def radio_callback(self, attr, old, new):
+        print(new)
+
+    def checkbox_callback(self, attr, old, new):
+        for text in self.plot.select(name='imbalance_text'):
+            text.visible = 0 in self.checkbox.active
+
+        for box in self.plot.select(name='OCBox'):
+            box.visible = 1 in self.checkbox.active
+
 
     def close(self, session_context):
         self.imba_rfile.close()
