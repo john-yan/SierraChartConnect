@@ -160,7 +160,6 @@ def ComputeImbalanceChartParameter(table, width, imbalance_highlight_factor):
     VolumeColor = raw_data[['VolumeAtBid', 'VolumeAtAsk']].astype(np.float32).apply(
         lambda x: '#FFC0C0' if x.VolumeAtBid > x.VolumeAtAsk else '#C0FFC0', axis=1).astype('string')
 
-
     # TODO: make volume bar colorful
     chart_parameter = pd.DataFrame({
             'CellTop': CellTop,
@@ -184,14 +183,18 @@ def PlotOHLCChart(fig, source):
     fig.quad(top='CellTop', bottom='CellBottom', left='CellLeft',
                         right='CellRight', source=source, fill_alpha=0.0, line_color='Color', line_width=2, name='OCBox')
 
-def PlotImbalanceChart(fig, source, colorProfile):
+def PlotImbalanceChart(fig, source):
     # plot base
     fig.quad(top='CellTop', bottom='CellBottom', left='CellLeft',
                         right='CellRight', color='#F0F0F0', source=source, name='hoverable')
 
     # plot volume profile
     fig.quad(top='CellTop', bottom='CellBottom', left='CellLeft',
-                        right='VolumeEnd', color='VolumeColor' if colorProfile else '#C0C0C0', source=source)
+                        right='VolumeEnd', color='#C0C0C0', source=source, name='GrayProfile')
+
+    # plot color volume profile
+    fig.quad(top='CellTop', bottom='CellBottom', left='CellLeft',
+                        right='VolumeEnd', color='VolumeColor', source=source, visible=False, name='ColorProfile')
 
     # plot bid
     fig.text(x='CellMiddle', y='CellBottom', text='VolAtBidText',
@@ -225,7 +228,6 @@ class Server:
 
     def __init__(self, imba_rfile, imba_hfile, ohlc_rfile, ohlc_hfile, colorProfile):
 
-        self.colorProfile = colorProfile
         self.imba_hfile = open(imba_hfile)
         self.imba_rfile = open(imba_rfile)
         self.ohlc_hfile = open(ohlc_hfile)
@@ -261,8 +263,8 @@ class Server:
         self.imba_rsource = ColumnDataSource(ComputeImbalanceChartParameter([], self.width, self.highlight_factor))
         self.ohlc_rsource = ColumnDataSource(ComputeOHLCChartParameter([], self.width))
 
-        PlotImbalanceChart(self.plot, imba_source, self.colorProfile)
-        PlotImbalanceChart(self.plot, self.imba_rsource, self.colorProfile)
+        PlotImbalanceChart(self.plot, imba_source)
+        PlotImbalanceChart(self.plot, self.imba_rsource)
 
         PlotOHLCChart(self.plot, ohlc_source)
         PlotOHLCChart(self.plot, self.ohlc_rsource)
@@ -272,7 +274,7 @@ class Server:
         self.checkbox = CheckboxGroup(labels=["Imbalance Table", "OCBox"], active=[0, 1], height_policy='fit', width_policy='min')
         self.checkbox.on_change('active', self.checkbox_callback)
 
-        self.radio = RadioGroup(labels=["Gray", "Color"], height_policy='fit', width_policy='fit')
+        self.radio = RadioGroup(labels=["Gray", "Color"], active=0, height_policy='fit', width_policy='fit')
         self.radio.on_change('active', self.radio_callback)
 
         control = row(children=[self.checkbox, self.radio], height_policy='fit')
@@ -285,7 +287,22 @@ class Server:
         self.thread.start()
 
     def radio_callback(self, attr, old, new):
-        print(new)
+        if old == new:
+            return
+
+        gray_visible = False
+        color_visible = False
+
+        if new == 0:
+            gray_visible = True
+        else:
+            color_visible = True
+
+        for r in self.plot.select(name='GrayProfile'):
+            r.visible = gray_visible
+
+        for r in self.plot.select(name='ColorProfile'):
+            r.visible = color_visible
 
     def checkbox_callback(self, attr, old, new):
         for text in self.plot.select(name='imbalance_text'):
@@ -307,7 +324,7 @@ class Server:
         hData, rData = self.queue.get()
 
         if not hData['imba'].empty:
-            PlotImbalanceChart(self.plot, hData['imba'], self.colorProfile)
+            PlotImbalanceChart(self.plot, hData['imba'])
             PlotOHLCChart(self.plot, hData['ohlc'])
             UpdateHoverTool(self.plot)
 
@@ -390,10 +407,9 @@ def Main():
     parser.add_argument('--imbaHfile', default='ESZ0-CME-imbalance-5min.hfile', help="Historical file")
     parser.add_argument('--ohlcRfile', default='ESZ0-CME-ohlc-5min.rfile', help="Realtime file")
     parser.add_argument('--ohlcHfile', default='ESZ0-CME-ohlc-5min.hfile', help="Historical file")
-    parser.add_argument('--colorProfile', default=False, action='store_true', help="Historical file")
 
     args = parser.parse_args()
-    server = Server(args.imbaRfile, args.imbaHfile, args.ohlcRfile, args.ohlcHfile, args.colorProfile)
+    server = Server(args.imbaRfile, args.imbaHfile, args.ohlcRfile, args.ohlcHfile)
 
 Main()
 
