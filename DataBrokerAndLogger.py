@@ -56,7 +56,8 @@ class DataBroker:
         self.client_index = 0
         self.lock = threading.Lock()
 
-        mode = 'a+' if isAppend else 'w+'
+        mode = 'a' if isAppend else 'w'
+        print(mode)
         self.logFD = open(logFile, mode)
 
         self.thread.start()
