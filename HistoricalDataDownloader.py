@@ -74,7 +74,9 @@ class Downloader:
         else:
             csv_format = "{DateTime},{Price},{Volume},{AtBidOrAsk}\n"
             #print(msg["BidVolume"], msg["AskVolume"])
-            assert(int(msg["BidVolume"]) == 0 or int(msg["AskVolume"]) == 0)
+            if not (int(msg["BidVolume"]) == 0 or int(msg["AskVolume"]) == 0):
+                print(msg)
+                assert(False)
             self.fd.write(csv_format.format(
                 DateTime = msg["StartDateTime"],
                 Price = msg["LastPrice"],
@@ -88,10 +90,45 @@ class Downloader:
             print("Has processed %d messages to up %s" % (
                 self.done_msgs, str(datetime.fromtimestamp(msg['StartDateTime'])) if 'StartDateTime' in msg.keys() else "unknown-datetime"))
 
-def Main():
+def Download(symbol, exchange='CME', userpass='userpass', address='192.168.122.107', port=11198, sDateTime=0, eDateTime=0, output=None, raw=False):
 
     # initialize color output
     colorama.init()
+
+    OUTPUT = "%s.csv" % symbol if output == None else output
+
+    with open(userpass) as f:
+        username = f.readline().strip('\n')
+        password = f.readline().strip('\n')
+        f.close()
+
+    client = DTCClient()
+    client.connect(address, port)
+    client.logon(username, password)
+
+    # historical data request for symbol
+    client.send_json_request({
+        'Type': DTC.HISTORICAL_PRICE_DATA_REQUEST,
+        'RequestID': 10,
+        'Symbol': symbol,
+        'Exchange': exchange,
+        'RecordInterval': DTC.INTERVAL_TICK,
+        'StartDateTime': sDateTime,
+        'EndDateTime': eDateTime,
+        'MaxDaysToReturn': 0,
+        'UseZLibCompression': 0
+    })
+
+    d = Downloader(client, OUTPUT, raw)
+    try:
+        client.run(d.json_handler)
+    except Exception as err:
+        if err.args[0] == "Done":
+            return
+        else:
+            raise err
+
+def Main():
 
     # parse arguments
     parser = argparse.ArgumentParser()
@@ -113,39 +150,8 @@ def Main():
     EXCHANGE = args.exchange
     sDateTime = int(args.sDateTime)
     eDateTime = int(args.eDateTime)
-    OUTPUT = "%s.csv" % SYMBOL if args.output == None else args.output
 
-
-    with open('userpass') as f:
-        username = f.readline().strip('\n')
-        password = f.readline().strip('\n')
-        f.close()
-
-    client = DTCClient()
-    client.connect(ADDR, PORT)
-    client.logon(username, password)
-
-    # historical data request for symbol
-    client.send_json_request({
-        'Type': DTC.HISTORICAL_PRICE_DATA_REQUEST,
-        'RequestID': 10,
-        'Symbol': SYMBOL,
-        'Exchange': EXCHANGE,
-        'RecordInterval': DTC.INTERVAL_TICK,
-        'StartDateTime': sDateTime,
-        'EndDateTime': eDateTime,
-        'MaxDaysToReturn': 0,
-        'UseZLibCompression': 0
-    })
-
-    d = Downloader(client, OUTPUT, args.raw)
-    try:
-        client.run(d.json_handler)
-    except Exception as err:
-        if err.args[0] == "Done":
-            return
-        else:
-            raise err
+    Download(SYMBOL, EXCHANGE, args.userpass, ADDR, PORT, sDateTime, eDateTime, args.output, args.raw)
 
 if __name__ == "__main__":
     Main()
