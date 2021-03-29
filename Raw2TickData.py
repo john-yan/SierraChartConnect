@@ -4,28 +4,30 @@ import argparse
 import numpy as np
 import random
 
-def ConvertRaw2Tick(input_file, output_file):
-    raw = pd.read_csv(input_file)
-    raw['AtBidOrAsk'] = (raw.Volume == raw.AskVolume).astype(np.int32) + 1
-    check = (raw.Volume != raw.AskVolume) & (raw.Volume != raw.BidVolume)
+def ConvertRaw2Tick(raw_df):
+    raw_df['AtBidOrAsk'] = (raw_df.Volume == raw_df.AskVolume).astype(np.int32) + 1
+    check = (raw_df.Volume != raw_df.AskVolume) & (raw_df.Volume != raw_df.BidVolume)
     if check.any() == True:
         print('Correcting these errors')
-        print(raw[check])
-        for i in raw[check].index:
-            if raw.iloc[i].HighPrice != raw.iloc[i].LowPrice:
-                at_ask = abs(raw.iloc[i].LastPrice - raw.iloc[i].HighPrice) > abs(raw.iloc[i].LastPrice - raw.iloc[i].LowPrice)
-                raw.at[i, 'AtBidOrAsk'] = int(at_ask) + 1
+        print(raw_df[check])
+        for i in raw_df[check].index:
+            if raw_df.iloc[i].HighPrice != raw_df.iloc[i].LowPrice:
+                at_ask = abs(raw_df.iloc[i].LastPrice - raw_df.iloc[i].HighPrice) > abs(raw_df.iloc[i].LastPrice - raw_df.iloc[i].LowPrice)
+                raw_df.at[i, 'AtBidOrAsk'] = int(at_ask) + 1
             else:
-                raw.at[i, 'AtBidOrAsk'] = random.choice([1, 2])
+                raw_df.at[i, 'AtBidOrAsk'] = random.choice([1, 2])
 
         print('After corrections')
-        print(raw[check])
+        print(raw_df[check])
 
-    output_columns = ['StartDateTime', 'LastPrice', 'Volume', 'AtBidOrAsk']
-    output_headers = ['DateTime', 'Price', 'Volume', 'AtBidOrAsk']
-    raw.to_csv(output_file, columns=output_columns, header=output_headers, index=False)
+    return pd.DataFrame({
+        'DateTime': raw_df.StartDateTime,
+        'Price': raw_df.LastPrice,
+        'Volume': raw_df.Volume,
+        'AtBidOrAsk': raw_df.AtBidOrAsk
+    })
 
-    #assert((raw.OpenPrice == 0).all() == True)
+    #assert((raw_df.OpenPrice == 0).all() == True)
 
 if __name__ == '__main__':
     # parse arguments
@@ -35,4 +37,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    ConvertRaw2Tick(args.input, args.output)
+    raw_df = pd.read_csv(args.input)
+    df = ConvertRaw2Tick(raw_df)
+
+    df.to_csv(args.output, index=False)
+

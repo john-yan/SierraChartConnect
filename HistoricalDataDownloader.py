@@ -14,6 +14,8 @@ from aiofile import async_open
 import numpy as np
 import asyncio as aio
 import pandas as pd
+from Raw2TickData import ConvertRaw2Tick
+
 '''
 raw json format for incoming traffic:
 {
@@ -103,6 +105,7 @@ async def Main():
     parser.add_argument('--sDateTime', default="0", help="Start DateTime")
     parser.add_argument('--eDateTime', default="0", help="End DateTime")
     parser.add_argument('--output', "-o", default=None, help="Output file name")
+    parser.add_argument('--raw', default=False, action='store_true', help="output raw file")
 
     args = parser.parse_args()
 
@@ -116,11 +119,14 @@ async def Main():
 
     data = await DownloadAsync(SYMBOL, EXCHANGE, args.userpass, ADDR, PORT, sDateTime, eDateTime)
 
-    print("Download Finished. Saving to %s" % OUTPUT)
-
-    data.drop(['Type', 'RequestID', 'IsFinalRecord'], axis=1).to_csv(OUTPUT, index=False)
-
-
+    if args.raw:
+        print("Download Finished. Saving to %s" % OUTPUT)
+        data.drop(['Type', 'RequestID', 'IsFinalRecord'], axis=1).to_csv(OUTPUT, index=False)
+    else:
+        print("Download Finished. Running convertion...")
+        data = ConvertRaw2Tick(data)
+        print("Convertion Finished. Saving to %s ..." % OUTPUT)
+        data.to_csv(OUTPUT, index=False)
 
 if __name__ == "__main__":
     loop = aio.get_event_loop()
