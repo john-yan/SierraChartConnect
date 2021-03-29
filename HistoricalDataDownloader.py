@@ -2,7 +2,7 @@
 # this script will download tick-by-tick data from SC and save it as SYMBOL.csv file
 
 import DTCProtocol_pb2 as DTC
-from DTCClient import DTCClient
+from DTCClient import DTCClient, DTCClientAsync
 import socket
 import json
 import threading
@@ -10,6 +10,10 @@ from datetime import datetime
 from termcolor import colored
 import argparse
 import colorama
+from aiofile import async_open
+import numpy as np
+import asyncio as aio
+import pandas as pd
 '''
 raw json format for incoming traffic:
 {
@@ -128,7 +132,66 @@ def Download(symbol, exchange='CME', userpass='userpass', address='192.168.122.1
         else:
             raise err
 
-def Main():
+async def DownloadAsync(symbol, exchange='CME', userpass='userpass', address='192.168.122.142', port=11198, sDateTime=0, eDateTime=0):
+
+    async with async_open(userpass, 'r') as f:
+        username = (await f.readline()).strip('\n')
+        password = (await f.readline()).strip('\n')
+
+    client = DTCClientAsync()
+    await client.connect(address, port)
+    await client.logon(username, password)
+
+    # historical data request for symbol
+    await client.send_json_request({
+        'Type': DTC.HISTORICAL_PRICE_DATA_REQUEST,
+        'RequestID': 10,
+        'Symbol': symbol,
+        'Exchange': exchange,
+        'RecordInterval': DTC.INTERVAL_TICK,
+        'StartDateTime': sDateTime,
+        'EndDateTime': eDateTime,
+        'MaxDaysToReturn': 0,
+        'UseZLibCompression': 0
+    })
+
+    data = []
+    done_msgs = 1
+    async for message in client.messages():
+
+        if message['Type'] != 803:
+            print(colored("Unprocess MSG: " + json.dumps(message), 'red'))
+            continue
+
+        if (message['IsFinalRecord'] == 1):
+            await client.close()
+            break
+
+        data.append(np.array(list(message.values())))
+        if done_msgs % 1000000 == 0:
+            print("Has processed %d messages to up %s" % (
+                done_msgs,
+                str(datetime.fromtimestamp(message['StartDateTime'])) if 'StartDateTime' in message.keys() else "unknown-datetime"))
+        done_msgs += 1
+
+    columns = [
+        "Type",
+        "RequestID",
+        "StartDateTime",
+        "OpenPrice",
+        "HighPrice",
+        "LowPrice",
+        "LastPrice",
+        "Volume",
+        "NumTrades",
+        "BidVolume",
+        "AskVolume",
+        "IsFinalRecord"
+    ]
+
+    return pd.DataFrame(np.array(data), columns=columns) if len(data) > 0 else pd.DataFrame()
+
+async def Main():
 
     # parse arguments
     parser = argparse.ArgumentParser()
@@ -140,7 +203,6 @@ def Main():
     parser.add_argument('--sDateTime', default="0", help="Start DateTime")
     parser.add_argument('--eDateTime', default="0", help="End DateTime")
     parser.add_argument('--output', "-o", default=None, help="Output file name")
-    parser.add_argument('--raw', default=False, action='store_true', help="output raw file")
 
     args = parser.parse_args()
 
@@ -150,10 +212,18 @@ def Main():
     EXCHANGE = args.exchange
     sDateTime = int(args.sDateTime)
     eDateTime = int(args.eDateTime)
+    OUTPUT = "%s.csv" % symbol if args.output == None else args.output
 
-    Download(SYMBOL, EXCHANGE, args.userpass, ADDR, PORT, sDateTime, eDateTime, args.output, args.raw)
+    data = await DownloadAsync(SYMBOL, EXCHANGE, args.userpass, ADDR, PORT, sDateTime, eDateTime)
+
+    print("Download Finished. Saving to %s" % OUTPUT)
+
+    data.drop(['Type', 'RequestID', 'IsFinalRecord'], axis=1).to_csv(OUTPUT, index=False)
+
+
 
 if __name__ == "__main__":
-    Main()
+    loop = aio.get_event_loop()
+    loop.run_until_complete(Main())
 
 
