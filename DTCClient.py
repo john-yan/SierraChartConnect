@@ -205,9 +205,11 @@ class DTCClientAsync:
         self.heartbeat_task = loop.create_task(self._heartbeat())
         self.receiver_task = loop.create_task(self.receiver())
 
-    def close(self):
+    async def close(self):
         if self.sock_writter:
             self.sock_writter.close()
+            await self.sock_writter.wait_closed()
+
 
     async def messages(self):
 
