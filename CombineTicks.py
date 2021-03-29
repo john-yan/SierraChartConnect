@@ -9,7 +9,7 @@ from utilities import follow
 import math
 
 trade_header = "DateTime,Price,Volume,AtBidOrAsk\n"
-trade_format = '%d,%.2f,%d,%d\n'
+trade_format = '%.1f,%.2f,%.1f,%.1f\n'
 
 def RemoveLastSecondTrades(data):
     if len(data) == 0:
@@ -31,10 +31,10 @@ def ReadFile(f):
     data = []
     for line in f:
         values = line.rstrip().split(',')
-        dt = int(values[0])
+        dt = float(values[0])
         price = float(values[1])
-        volume = int(values[2])
-        at_bid_or_ask = int(values[3])
+        volume = float(values[2])
+        at_bid_or_ask = float(values[3])
         data.append((dt, price, volume, at_bid_or_ask))
 
     return data
