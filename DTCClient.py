@@ -181,11 +181,25 @@ class DTCClientAsync:
         except Exception as err:
             print(colored("Heartbeat failed - %s" % repr(err), 'red'));
 
+    async def set_encoding_to_json(self):
+        size = b'\x10\x00'
+        _type = b'\x06\x00'
+        pv = b'\x08\x00\x00\x00'
+        encoding = b'\x02\x00\x00\x00'
+        pt = b'DTC\x00'
+
+        req = size + _type + pv + encoding + pt
+        self.sock_writter.write(req)
+        await self.sock_writter.drain()
+        res = await self.sock_reader.read(16)
+        print(res)
+
     async def connect(self, ip_addr, port):
 
         self.ip_addr = ip_addr
         self.port = port
         self.sock_reader, self.sock_writter = await aio.open_connection(ip_addr, port)
+        await self.set_encoding_to_json()
 
 
     async def logon(self, username, password, name = "hello"):
