@@ -182,11 +182,13 @@ class DTCClientAsync:
             print(colored("Heartbeat failed - %s" % repr(err), 'red'));
 
     async def set_encoding_to_json(self):
-        size = b'\x10\x00'
-        _type = b'\x06\x00'
-        pv = b'\x08\x00\x00\x00'
-        encoding = b'\x02\x00\x00\x00'
+        _type = DTC.ENCODING_REQUEST.to_bytes(2, byteorder='little', signed=True)
+        pv = DTC.CURRENT_VERSION.to_bytes(4, byteorder='little', signed=True)
+        encoding = DTC.JSON_ENCODING.to_bytes(4, byteorder='little', signed=True)
         pt = b'DTC\x00'
+        size = 2 + len(_type) + len(pv) + len(encoding) + len(pt)
+        assert(size == 16)
+        size = size.to_bytes(2, byteorder='little', signed=True)
 
         req = size + _type + pv + encoding + pt
         self.sock_writter.write(req)
@@ -286,5 +288,8 @@ async def main():
             await log.write(message)
 
 if __name__ == '__main__':
-    loop = aio.get_event_loop()
-    loop.run_until_complete(main())
+    try:
+        loop = aio.get_event_loop()
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        print('Exiting')
