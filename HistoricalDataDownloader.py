@@ -10,11 +10,11 @@ from datetime import datetime
 from termcolor import colored
 import argparse
 import colorama
-from aiofile import async_open
 import numpy as np
 import asyncio as aio
 import pandas as pd
 from Raw2TickData import ConvertRaw2Tick
+import aiofiles
 
 '''
 raw json format for incoming traffic:
@@ -36,7 +36,7 @@ raw json format for incoming traffic:
 
 async def DownloadAsync(symbol, exchange='CME', userpass='userpass', address='192.168.122.142', port=11198, sDateTime=0, eDateTime=0):
 
-    async with async_open(userpass, 'r') as f:
+    async with aiofiles.open(userpass, 'r') as f:
         username = (await f.readline()).strip('\n')
         password = (await f.readline()).strip('\n')
 

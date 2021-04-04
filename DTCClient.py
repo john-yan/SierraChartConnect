@@ -10,7 +10,7 @@ from datetime import datetime
 from termcolor import colored
 import colorama
 import  asyncio as aio
-from aiofile import async_open
+import aiofiles
 import argparse
 colorama.init()
 
@@ -254,7 +254,7 @@ async def main():
     SYMBOL = args.symbol
     EXCHANGE = args.exchange
 
-    async with async_open(args.userpass, 'r') as f:
+    async with aiofiles.open(args.userpass, 'r') as f:
         username = (await f.readline()).strip('\n')
         password = (await f.readline()).strip('\n')
 
@@ -280,12 +280,13 @@ async def main():
     })
 
     mode = 'a' if args.append else 'w'
-    async with async_open(args.logFile, mode) as log:
+    async with aiofiles.open(args.logFile, mode) as log:
         async for message in dtc.messages():
             assert(message[-1] == 0)
             message = message[:-1].decode('ascii')
             message += '\n'
             await log.write(message)
+            await log.flush()
 
 if __name__ == '__main__':
     try:
