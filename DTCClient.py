@@ -168,7 +168,8 @@ class DTCClientAsync:
                 else:
                     await self.queue.put(msg)
         except Exception as err:
-            print(colored("Receiver handler failed - %s" % repr(err), 'red'));
+            #print(colored("Receiver handler failed - %s" % repr(err), 'red'));
+            pass
 
         await self.queue.put(b'')
         print(colored("Receiver exiting", 'red'));
@@ -179,7 +180,8 @@ class DTCClientAsync:
                 await aio.sleep(self.HEARTBEAT_INTERNAL)
                 await self.send_json_request({ "Type": DTC.HEARTBEAT });
         except Exception as err:
-            print(colored("Heartbeat failed - %s" % repr(err), 'red'));
+            #print(colored("Heartbeat failed - %s" % repr(err), 'red'));
+            pass
 
     async def set_encoding_to_json(self):
         _type = DTC.ENCODING_REQUEST.to_bytes(2, byteorder='little', signed=True)
@@ -194,7 +196,7 @@ class DTCClientAsync:
         self.sock_writter.write(req)
         await self.sock_writter.drain()
         res = await self.sock_reader.read(16)
-        print(res)
+        assert(res == b'\x10\x00\x07\x00\x08\x00\x00\x00\x02\x00\x00\x00DTC\x00')
 
     async def connect(self, ip_addr, port):
 
@@ -222,10 +224,24 @@ class DTCClientAsync:
         self.receiver_task = loop.create_task(self.receiver())
 
     async def close(self):
+        try:
+            if not self.heartbeat_task.done():
+                self.heartbeat_task.cancel()
+            await self.heartbeat_task
+        except aio.CancelledError:
+            pass
+        try:
+            if not self.receiver_task.done():
+                self.receiver_task.cancel()
+            await self.receiver_task
+        except aio.CancelledError:
+            pass
+
         if self.sock_writter:
             self.sock_writter.close()
             await self.sock_writter.wait_closed()
 
+        await self.queue.put(b'')
 
     async def messages(self):
 
