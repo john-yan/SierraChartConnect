@@ -34,7 +34,14 @@ raw json format for incoming traffic:
 }
 '''
 
-async def DownloadAsync(symbol, exchange='CME', userpass='userpass', address='192.168.122.142', port=11198, sDateTime=0, eDateTime=0):
+async def DownloadAsync(symbol,
+                        exchange='CME',
+                        userpass='userpass',
+                        address='192.168.122.142',
+                        port=11198,
+                        sDateTime=0,
+                        eDateTime=0,
+                        recordInterval=DTC.INTERVAL_TICK):
 
     async with aiofiles.open(userpass, 'r') as f:
         username = (await f.readline()).strip('\n')
@@ -50,7 +57,7 @@ async def DownloadAsync(symbol, exchange='CME', userpass='userpass', address='19
         'RequestID': 10,
         'Symbol': symbol,
         'Exchange': exchange,
-        'RecordInterval': DTC.INTERVAL_TICK,
+        'RecordInterval': recordInterval,
         'StartDateTime': sDateTime,
         'EndDateTime': eDateTime,
         'MaxDaysToReturn': 0,
@@ -106,6 +113,7 @@ async def Main():
     parser.add_argument('--eDateTime', default="0", help="End DateTime")
     parser.add_argument('--output', "-o", default=None, help="Output file name")
     parser.add_argument('--raw', default=False, action='store_true', help="output raw file")
+    parser.add_argument('--record_interval', default='INTERVAL_TICK', help="Record interval")
 
     args = parser.parse_args()
 
@@ -117,7 +125,13 @@ async def Main():
     eDateTime = int(args.eDateTime)
     OUTPUT = "%s.csv" % symbol if args.output == None else args.output
 
-    data = await DownloadAsync(SYMBOL, EXCHANGE, args.userpass, ADDR, PORT, sDateTime, eDateTime)
+    try:
+        interval = eval('DTC.%s' % args.record_interval)
+    except:
+        print("Unknown interval: %s" % args.record_interval)
+        return
+
+    data = await DownloadAsync(SYMBOL, EXCHANGE, args.userpass, ADDR, PORT, sDateTime, eDateTime, interval)
 
     if args.raw:
         print("Download Finished. Saving to %s" % OUTPUT)
