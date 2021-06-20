@@ -143,7 +143,6 @@ async def Main():
         data.to_csv(OUTPUT, index=False)
 
 if __name__ == "__main__":
-    loop = aio.get_event_loop()
-    loop.run_until_complete(Main())
-
+    print("Downloading historical data has been banned from June 3rd, 2021")
+    print('However, you can instead directly read SCID file.')
 
