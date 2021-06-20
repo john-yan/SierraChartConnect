@@ -255,7 +255,6 @@ class DTCClientAsync:
 async def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--userpass', "-i", default="userpass", help="Username and Password file.")
     parser.add_argument('--address', "-a", default="192.168.122.142", help="IP Address of Sierra Chart instance")
     parser.add_argument('--port', "-p", type=int, default=11199, help="Port number of Sierra Chart instance")
     parser.add_argument('--symbol', "-s", required=True, help="Symbol Name")
@@ -270,9 +269,8 @@ async def main():
     SYMBOL = args.symbol
     EXCHANGE = args.exchange
 
-    async with aiofiles.open(args.userpass, 'r') as f:
-        username = (await f.readline()).strip('\n')
-        password = (await f.readline()).strip('\n')
+    username = 'dtc_client'
+    password = 'password'
 
     dtc = DTCClientAsync(False, False)
     await dtc.connect(ADDR, PORT)
