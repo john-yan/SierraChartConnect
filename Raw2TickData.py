@@ -3,6 +3,7 @@ import pandas as pd
 import argparse
 import numpy as np
 import random
+import sys
 
 def ConvertRaw2Tick(raw_df):
     raw_df['AtBidOrAsk'] = (raw_df.Volume == raw_df.AskVolume).astype(np.int32) + 1
@@ -32,13 +33,16 @@ def ConvertRaw2Tick(raw_df):
 if __name__ == '__main__':
     # parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', "-i", default=None, help="Input file name")
-    parser.add_argument('--output', "-o", default=None, help="Output file name")
+    parser.add_argument('--input', "-i", default='-', help="Input file name")
+    parser.add_argument('--output', "-o", default='-', help="Output file name")
 
     args = parser.parse_args()
 
-    raw_df = pd.read_csv(args.input)
+    INPUT = args.input if args.input != '-' else sys.stdin
+    OUTPUT = args.output if args.output != '-' else sys.stdout
+
+    raw_df = pd.read_csv(INPUT)
     df = ConvertRaw2Tick(raw_df)
 
-    df.to_csv(args.output, index=False)
+    df.to_csv(OUTPUT, index=False)
 
