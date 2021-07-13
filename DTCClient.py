@@ -272,7 +272,7 @@ async def main():
     username = 'dtc_client'
     password = 'password'
 
-    dtc = DTCClientAsync(False, False)
+    dtc = DTCClientAsync(True, True)
     await dtc.connect(ADDR, PORT)
     await dtc.logon(username, password)
 
@@ -296,10 +296,7 @@ async def main():
     mode = 'a' if args.append else 'w'
     async with aiofiles.open(args.logFile, mode) as log:
         async for message in dtc.messages():
-            assert(message[-1] == 0)
-            message = message[:-1].decode('ascii')
-            message += '\n'
-            await log.write(message)
+            await log.write(json.dumps(message) + '\n')
             await log.flush()
 
 if __name__ == '__main__':
